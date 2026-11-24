@@ -1,0 +1,55 @@
+# ===== 環境変数・秘密情報 =====
+.env
+.env.*
+!.env.example
+
+# ===== 非公開資料（別途受領して private/ に置く） =====
+private/
+# private/ の外に置かれた場合の保険
+helpdesk_overview*.md
+Novel HELPDESK - Sample*.pdf
+
+# ===== Claude Code（個人設定） =====
+CLAUDE.local.md
+.claude/settings.local.json
+
+# ===== OS・エディタ =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# ===== Python（helpdesk-be） =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# ===== Node（helpdesk-fe） =====
+node_modules/
+dist/
+coverage/
+*.log
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# ===== Playwright =====
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ===== DB データ（Docker ボリュームをローカルに置く場合） =====
+mysql_data/
