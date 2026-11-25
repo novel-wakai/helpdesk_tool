@@ -152,7 +152,7 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
-| E2E テスト | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+| E2E テスト（BE を起動した状態で実行） | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
 | FE の Lint（問題の検出 / 自動修正） | `yarn lint` / `yarn lint:fix` | helpdesk-fe |
 | FE の書式（確認 / 自動修正） | `yarn format:check` / `yarn format:fix` | helpdesk-fe |
 
