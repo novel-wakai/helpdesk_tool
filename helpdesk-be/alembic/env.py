@@ -18,7 +18,12 @@ import app.models  # noqa: E402,F401  モデルを読み込んで metadata に�
 from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
 
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+# alembic.ini の値は文字列で渡す必要がある。
+# - str(URL) だとパスワードが *** に伏せられるため、hide_password=False で文字列にする
+# - alembic.ini の値では % が特別な意味を持つため、%% にエスケープする
+#   （パスワードに記号があると、URL エンコードで % が入るため）
+database_url = settings.database_url.render_as_string(hide_password=False)
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 
