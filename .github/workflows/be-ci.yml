@@ -1,0 +1,185 @@
+# Backend（helpdesk-be）の CI
+#
+# push と PR のたびに、次の 3 つを自動で実行する。どれかが失敗すると PR に ❌ が付く。
+#   - lint   : Ruff で問題を検出する（make lint と同じ）
+#   - format : Ruff で書式がそろっているか確認する（make format-check と同じ）
+#   - test   : pytest で単体テストを実行する（テスト用の MySQL を CI 上で起動する）
+# 最後に result で、上の結果をまとめて判定する。
+#
+# BE に変更がないとき（FE だけの変更など）は、lint / format / test をスキップする。
+# スキップされたジョブは GitHub 上で「成功」扱いになるため、マージは止まらない。
+# （ワークフロー自体を paths で絞ると、チェックが届かずマージできなくなるため、この方式にしている）
+
+name: BE CI
+
+on:
+  push:
+    # ブランチへの push だけで動かす（リリースのタグを付けたときには動かさない）
+    branches: ["**"]
+  pull_request:
+
+# 同じブランチ・PR で新しく実行されたら、古い実行は止める。
+# ただし develop と main は止めない（続けてマージしたとき、前のマージの結果も残すため）
+concurrency:
+  group: be-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main' }}
+
+# コードの読み取りだけを許可する
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: helpdesk-be
+
+jobs:
+  # BE に関係するファイルが変わったかを判定する
+  changes:
+    name: be-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      be: ${{ steps.filter.outputs.be }}
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # 比べる相手
+          # - PR のとき：PR のマージ先（この指定は使われない）
+          # - push のとき：develop から分かれた地点（develop 自身への push は、push の直前のコミット）
+          #   指定しないとリポジトリの既定ブランチ（main）と比べるため、develop にあって main にない
+          #   BE の変更まで拾ってしまい、FE だけの変更でもスキップされなくなる
+          base: develop
+          filters: |
+            be:
+              - 'helpdesk-be/**'
+              - '.github/workflows/be-ci.yml'
+
+  lint:
+    name: be-lint
+    needs: changes
+    if: needs.changes.outputs.be == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Poetry をインストール
+        run: pipx install "poetry>=2,<3"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: poetry
+          cache-dependency-path: helpdesk-be/poetry.lock
+      - name: パッケージをインストール
+        run: poetry install --no-root --no-interaction
+      - name: Ruff で問題を検出する
+        run: poetry run ruff check --output-format=github .
+
+  format:
+    name: be-format
+    needs: changes
+    if: needs.changes.outputs.be == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Poetry をインストール
+        run: pipx install "poetry>=2,<3"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: poetry
+          cache-dependency-path: helpdesk-be/poetry.lock
+      - name: パッケージをインストール
+        run: poetry install --no-root --no-interaction
+      - name: Ruff で書式を確認する
+        run: poetry run ruff format --check --diff .
+
+  test:
+    name: be-test
+    needs: changes
+    if: needs.changes.outputs.be == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # テスト用の MySQL（docker-compose.yml の db-test に相当）
+    # CI 専用の使い捨て DB のため、パスワードは公開してよい固定値を使う
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: helpdesk_test
+          MYSQL_USER: helpdesk
+          MYSQL_PASSWORD: ci-password
+          TZ: Asia/Tokyo
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL_USER: helpdesk
+      MYSQL_PASSWORD: ci-password
+      # 開発用 DB の名前（テストでは使わないが、設定の読み込みに必要）
+      MYSQL_DATABASE: helpdesk
+      TEST_MYSQL_DATABASE: helpdesk_test
+      TEST_MYSQL_HOST: 127.0.0.1
+      TEST_MYSQL_PORT: 3306
+    steps:
+      - uses: actions/checkout@v7
+      # services では MySQL の起動オプションを渡せないため、起動後に docker-compose.yml の db-test と
+      # 同じ文字コード・照合順序（utf8mb4 / utf8mb4_unicode_ci）にそろえる。
+      # そろえないと MySQL 8.0 の既定（utf8mb4_0900_ai_ci）になり、文字の比較や並び順がローカルと変わる
+      - name: MySQL の文字コードをローカルとそろえる
+        run: |
+          docker exec ${{ job.services.mysql.id }} mysql -uroot -pci-root-password -e "
+            SET PERSIST character_set_server = 'utf8mb4';
+            SET PERSIST collation_server = 'utf8mb4_unicode_ci';
+            ALTER DATABASE helpdesk_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            SELECT @@GLOBAL.character_set_server, @@GLOBAL.collation_server, DEFAULT_COLLATION_NAME
+              FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'helpdesk_test';"
+      - name: Poetry をインストール
+        run: pipx install "poetry>=2,<3"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: poetry
+          cache-dependency-path: helpdesk-be/poetry.lock
+      - name: パッケージをインストール
+        run: poetry install --no-root --no-interaction
+      - name: pytest で単体テストを実行する
+        run: poetry run pytest -v
+
+  # 上のジョブの結果をまとめて判定する
+  # be-changes が失敗すると lint / format / test は「スキップ」になり、GitHub はスキップを「成功」と
+  # 扱うため、何も確認しないままマージできてしまう。それを防ぐため、どれかが失敗・中断していたら失敗にする
+  result:
+    name: be-result
+    needs: [changes, lint, format, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: 各ジョブの結果を表示する
+        run: |
+          echo "be-changes: ${{ needs.changes.result }}"
+          echo "be-lint   : ${{ needs.lint.result }}"
+          echo "be-format : ${{ needs.format.result }}"
+          echo "be-test   : ${{ needs.test.result }}"
+      - name: 失敗・中断したジョブがあれば失敗にする
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::BE CI のジョブに失敗または中断したものがあります。上の結果を確認してください"
+          exit 1

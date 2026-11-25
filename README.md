@@ -18,8 +18,9 @@
 3. [セットアップ](#セットアップ)
 4. [よく使うコマンド](#よく使うコマンド)
 5. [Linter / Formatter](#linter--formatter)
-6. [ブランチ運用ルール](#ブランチ運用ルール)
-7. [参考資料](#参考資料)
+6. [CI（自動チェック）](#ci自動チェック)
+7. [ブランチ運用ルール](#ブランチ運用ルール)
+8. [参考資料](#参考資料)
 
 ## システム構成
 
@@ -238,6 +239,38 @@ yarn format:fix    # 書式を自動でそろえる
 - 整形の設定（文字数など）は各プロジェクトの設定ファイル（`helpdesk-be/pyproject.toml`、`helpdesk-fe/.prettierrc.json`）が優先されるため、VS Code の個人設定の値は使われません
 - **（Backend）Ruff の指摘が出ないとき**：`helpdesk-be/.venv` が作られているか確認する（セットアップの「3. Backend を起動する」の手順）。コマンドパレットの「Python: Select Interpreter」で `helpdesk-be/.venv` を選ぶ
 
+## CI（自動チェック）
+
+GitHub Actions で、ブランチへの push と PR のたびに Lint・書式・テストを自動で実行します（タグの push では実行しません）。
+
+結果は PR 画面に表示されます。`develop` と `main` のブランチ保護で必須チェックに設定すると、**どれか 1 つでも失敗した PR はマージできなくなります**（設定内容は「[GitHub の推奨設定](#github-の推奨設定)」を参照）。
+
+### Backend（helpdesk-be）
+
+設定ファイル：`.github/workflows/be-ci.yml`（PR 画面での表示名は `BE CI`）
+
+| チェック | 内容 | ローカルで同じことをするコマンド（helpdesk-be で実行） |
+|---|---|---|
+| `be-lint` | Ruff で問題を検出する | `make lint` |
+| `be-format` | Ruff で書式がそろっているか確認する | `make format-check` |
+| `be-test` | pytest で単体テストを実行する（CI 上でテスト用の MySQL を起動する） | `docker compose exec be pytest`（リポジトリ直下で実行） |
+| `be-result` | 上の 3 つ（と、変更の判定 `be-changes`）の結果をまとめ、失敗・中断があれば失敗にする | － |
+
+- `helpdesk-be/` に変更がない push・PR（FE だけの変更など）では、`be-lint` / `be-format` / `be-test` はスキップされます。スキップは「成功」扱いのため、マージは止まりません
+  - PR では、マージ先のブランチとの差分で判定します
+  - push では、`develop` から分かれた後の変更で判定します（`develop` 自身への push は、push の直前との差分）
+- `be-result` は、変更の判定（`be-changes`）が失敗したときに、検査がスキップされたままマージされるのを防ぐためのチェックです
+- CI の MySQL は CI 専用の使い捨てです。ワークフローに書いてあるパスワードは CI でしか使わないため、公開されていても問題ありません
+- CI の MySQL の文字コードと照合順序（`utf8mb4` / `utf8mb4_unicode_ci`）は、`docker-compose.yml` の `db-test` とそろえています
+
+### 結果の見方と、失敗したとき
+
+1. PR 画面の下部（Checks）に、チェックごとの結果（✅ / ❌）が表示されます
+2. ❌ の横の「Details」を開くと、どこで失敗したかのログが見られます（Lint の指摘は、PR の「Files changed」のコード上にも表示されます）
+3. 上の表のコマンドをローカルで実行して直し、もう一度 push すると、CI が自動で再実行されます
+
+書式の失敗は `make format-fix`、Lint の失敗の多くは `make lint-fix` で直せます。
+
 ## ブランチ運用ルール
 
 `main` と `develop` の 2 本を常設し、作業はすべて作業用ブランチで行います。作業用ブランチはプルリクエスト（PR）でマージします。
@@ -405,6 +438,7 @@ gh pr create --base develop
 ルールを守りやすくするため、`main` と `develop` にブランチ保護（Settings → Branches）を設定します。
 
 - 直接 push を禁止し、PR を必須にする（Require a pull request before merging）
+- CI の成功をマージの条件にする（Require status checks to pass before merging）。必須にするチェックは `be-lint` / `be-format` / `be-test` / `be-result`
 - force push と削除を禁止する
 - マージ後に作業用ブランチを自動で削除する（Settings → General → Automatically delete head branches）
 
