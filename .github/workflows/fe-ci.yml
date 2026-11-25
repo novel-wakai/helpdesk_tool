@@ -1,0 +1,169 @@
+# Frontend（helpdesk-fe）の CI
+#
+# push と PR のたびに、次の 4 つを自動で実行する。どれかが失敗すると PR に ❌ が付く。
+#   - lint   : ESLint で問題を検出する（yarn lint と同じ）
+#   - format : Prettier で書式がそろっているか確認する（yarn format:check と同じ）
+#   - test   : Vitest で単体テストを実行する（yarn test と同じ）
+#   - build  : 型チェックと本番用のビルドを行う（yarn build と同じ）。
+#              Vitest は型チェックをしないため、型の誤りはここで見つける
+# 最後に result で、上の結果をまとめて判定する。
+#
+# E2E テスト（Playwright）は BE を起動した状態で動かす前提のため、ここでは実行しない。
+#
+# FE に変更がないとき（BE だけの変更など）は、lint / format / test / build をスキップする。
+# スキップされたジョブは GitHub 上で「成功」扱いになるため、マージは止まらない。
+# （ワークフロー自体を paths で絞ると、チェックが届かずマージできなくなるため、この方式にしている）
+
+name: FE CI
+
+on:
+  push:
+    # ブランチへの push だけで動かす（リリースのタグを付けたときには動かさない）
+    branches: ["**"]
+  pull_request:
+
+# 同じブランチ・PR で新しく実行されたら、古い実行は止める。
+# ただし develop と main は止めない（続けてマージしたとき、前のマージの結果も残すため）
+concurrency:
+  group: fe-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main' }}
+
+# コードの読み取りだけを許可する
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: helpdesk-fe
+
+jobs:
+  # FE に関係するファイルが変わったかを判定する
+  changes:
+    name: fe-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      fe: ${{ steps.filter.outputs.fe }}
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # 比べる相手
+          # - PR のとき：PR のマージ先。base は使われず、指定すると警告が出るため空にする
+          # - push のとき：develop から分かれた地点（develop 自身への push は、push の直前のコミット）
+          #   指定しないとリポジトリの既定ブランチ（main）と比べるため、develop にあって main にない
+          #   FE の変更まで拾ってしまい、BE だけの変更でもスキップされなくなる
+          base: ${{ github.event_name == 'push' && 'develop' || '' }}
+          filters: |
+            fe:
+              - 'helpdesk-fe/**'
+              - '.github/workflows/fe-ci.yml'
+
+  lint:
+    name: fe-lint
+    needs: changes
+    if: needs.changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      # Node.js のバージョンは helpdesk-fe/.nvmrc（ローカルと同じ）を使う。
+      # setup-node は ESLint / TypeScript のエラーを PR のコード上に表示する仕組みも登録する
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: helpdesk-fe/.nvmrc
+          cache: yarn
+          cache-dependency-path: helpdesk-fe/yarn.lock
+      # yarn.lock と package.json が食い違っていたら失敗させる（lock の更新漏れを見つける）
+      - name: パッケージをインストール
+        run: yarn install --frozen-lockfile
+      - name: ESLint で問題を検出する
+        run: yarn lint
+
+  format:
+    name: fe-format
+    needs: changes
+    if: needs.changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: helpdesk-fe/.nvmrc
+          cache: yarn
+          cache-dependency-path: helpdesk-fe/yarn.lock
+      - name: パッケージをインストール
+        run: yarn install --frozen-lockfile
+      - name: Prettier で書式を確認する
+        run: yarn format:check
+
+  test:
+    name: fe-test
+    needs: changes
+    if: needs.changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: helpdesk-fe/.nvmrc
+          cache: yarn
+          cache-dependency-path: helpdesk-fe/yarn.lock
+      - name: パッケージをインストール
+        run: yarn install --frozen-lockfile
+      # GitHub Actions 上では、Vitest が失敗したテストを PR のコード上にも表示する
+      - name: Vitest で単体テストを実行する
+        run: yarn test
+
+  build:
+    name: fe-build
+    needs: changes
+    if: needs.changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: helpdesk-fe/.nvmrc
+          cache: yarn
+          cache-dependency-path: helpdesk-fe/yarn.lock
+      - name: パッケージをインストール
+        run: yarn install --frozen-lockfile
+      - name: 型チェックと本番用のビルドを行う
+        run: yarn build
+
+  # 上のジョブの結果をまとめて判定する
+  # fe-changes が失敗すると lint / format / test / build は「スキップ」になり、GitHub はスキップを
+  # 「成功」と扱うため、何も確認しないままマージできてしまう。それを防ぐため、どれかが失敗・中断していたら失敗にする
+  result:
+    name: fe-result
+    needs: [changes, lint, format, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: 各ジョブの結果を表示する
+        run: |
+          echo "fe-changes: ${{ needs.changes.result }}"
+          echo "fe-lint   : ${{ needs.lint.result }}"
+          echo "fe-format : ${{ needs.format.result }}"
+          echo "fe-test   : ${{ needs.test.result }}"
+          echo "fe-build  : ${{ needs.build.result }}"
+      - name: 失敗・中断したジョブがあれば失敗にする
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::FE CI のジョブに失敗または中断したものがあります。上の結果を確認してください"
+          exit 1
