@@ -121,8 +121,11 @@ jobs:
           TZ: Asia/Tokyo
         ports:
           - 3306:3306
+        # 起動の確認は TCP（127.0.0.1）で行う。MySQL は初回起動時に初期設定用の仮サーバーを
+        # ソケット接続だけで立ち上げてから、本番のサーバーに切り替える。localhost（ソケット）で確認すると
+        # 仮サーバーにも応答してしまい、切り替え中に次の手順が始まって接続に失敗することがある
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -pci-root-password"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci-root-password"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
