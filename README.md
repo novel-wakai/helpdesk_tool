@@ -17,8 +17,9 @@
 2. [使用技術](#使用技術)
 3. [セットアップ](#セットアップ)
 4. [よく使うコマンド](#よく使うコマンド)
-5. [ブランチ運用ルール](#ブランチ運用ルール)
-6. [参考資料](#参考資料)
+5. [Linter / Formatter](#linter--formatter)
+6. [ブランチ運用ルール](#ブランチ運用ルール)
+7. [参考資料](#参考資料)
 
 ## システム構成
 
@@ -68,6 +69,7 @@ helpdesk_tool/
 | HTTP クライアント | Axios |
 | ルーティング | React Router v7 |
 | グラフ描画 | Recharts |
+| Linter / Formatter | ESLint / Prettier |
 | テスト | Vitest + React Testing Library、E2E は Playwright |
 | パッケージ管理 | yarn |
 
@@ -146,6 +148,51 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
 | E2E テスト | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+| FE の Lint（問題の検出 / 自動修正） | `yarn lint` / `yarn lint:fix` | helpdesk-fe |
+| FE の書式（確認 / 自動修正） | `yarn format:check` / `yarn format:fix` | helpdesk-fe |
+
+## Linter / Formatter
+
+### Frontend（ESLint / Prettier）
+
+| ツール | 役割 | 設定ファイル |
+|---|---|---|
+| ESLint | コードの問題を見つける（未使用の変数、React のフックの誤った使い方など） | `helpdesk-fe/eslint.config.js` |
+| Prettier | 書式を自動でそろえる（引用符、セミコロン、改行など） | `helpdesk-fe/.prettierrc.json` |
+
+書式に関するルールは Prettier に任せ、ESLint 側では無効にしています（`eslint-config-prettier`）。両方を実行しても指摘がぶつかりません。
+
+#### コマンドで実行する
+
+`helpdesk-fe` で実行します（事前に `yarn install` が必要です）。
+
+```bash
+yarn lint          # 問題を検出する（問題があれば終了コード 1）
+yarn lint:fix      # 自動で直せる問題を直す
+yarn format:check  # 書式がそろっているか確認する（ずれがあれば終了コード 1）
+yarn format:fix    # 書式を自動でそろえる
+```
+
+`yarn lint:fix` で直らない指摘（未使用の変数、フックの呼び出し位置など）は、メッセージに従って手で直してください。
+
+#### VS Code で使う
+
+1. このリポジトリ（`helpdesk_tool`）を VS Code で開く
+2. 右下に表示される「推奨拡張機能」から、次の 2 つをインストールする（拡張機能の画面で `@recommended` と検索しても表示されます）
+   - ESLint（`dbaeumer.vscode-eslint`）
+   - Prettier - Code formatter（`esbenp.prettier-vscode`）
+3. インストール後、コマンドパレット（`Cmd + Shift + P`）で「Developer: Reload Window」を実行する
+
+設定は `.vscode/settings.json` に入っているため、追加の設定は不要です。
+
+- ESLint の指摘が、エディタ上に波線で表示され、「問題」パネルにも一覧で表示されます
+- ファイルを保存すると、Prettier で書式がそろい、ESLint で自動修正できる問題が直ります
+
+うまく動かないときは、次を確認してください。
+
+- **拡張機能が無効になっていないか**：拡張機能の画面で ESLint / Prettier を開き、「無効」になっていたら「有効にする」の横の ▼ から「有効にする（ワークスペース）」を選ぶ（このプロジェクトだけで有効になります）
+- **`Cmd + S` で保存しているか**：VS Code の自動保存（`files.autoSave`）では整形は動きません
+- 整形の設定（文字数など）は `helpdesk-fe/.prettierrc.json` が優先されるため、VS Code の個人設定の Prettier の値は使われません
 
 ## ブランチ運用ルール
 

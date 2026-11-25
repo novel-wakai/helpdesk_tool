@@ -1,0 +1,32 @@
+{
+    // ===== Frontend（helpdesk-fe）: ESLint / Prettier =====
+    // ESLint の設定ファイル（helpdesk-fe/eslint.config.js）を見つけられるように、作業フォルダを指定する
+    "eslint.workingDirectories": [{ "directory": "./helpdesk-fe", "changeProcessCWD": true }],
+    // Prettier は設定ファイル（.prettierrc.json）があるフォルダでだけ動かす
+    "prettier.requireConfig": true,
+
+    // 保存時に Prettier で整形し、ESLint で自動修正できる指摘を直す
+    // formatOnSaveMode: "file" … 個人設定で「変更した行だけ整形」になっていても、ファイル全体を整形する
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" }
+    },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" }
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file"
+    }
+}
