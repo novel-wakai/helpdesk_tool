@@ -52,11 +52,11 @@ jobs:
         id: filter
         with:
           # 比べる相手
-          # - PR のとき：PR のマージ先（この指定は使われない）
+          # - PR のとき：PR のマージ先。base は使われず、指定すると警告が出るため空にする
           # - push のとき：develop から分かれた地点（develop 自身への push は、push の直前のコミット）
           #   指定しないとリポジトリの既定ブランチ（main）と比べるため、develop にあって main にない
           #   BE の変更まで拾ってしまい、FE だけの変更でもスキップされなくなる
-          base: develop
+          base: ${{ github.event_name == 'push' && 'develop' || '' }}
           filters: |
             be:
               - 'helpdesk-be/**'
