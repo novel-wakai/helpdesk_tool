@@ -1,0 +1,65 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Tokyo
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      # ホストの 3306 はローカルの MySQL と衝突しやすいため 3307 で公開する
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # pytest 専用の DB。データはメモリ上（tmpfs）に置き、コンテナを止めると消える
+  db-test:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${TEST_MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Tokyo
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3308:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  be:
+    build:
+      context: ./helpdesk-be
+      # 開発用のステージ（pytest などの開発用パッケージを含む）。本番用は target: prod
+      target: dev
+    env_file: .env
+    environment:
+      # コンテナ内からは compose のサービス名で DB に接続する
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      TEST_MYSQL_HOST: db-test
+      TEST_MYSQL_PORT: 3306
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./helpdesk-be:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      db-test:
+        condition: service_healthy
+
+volumes:
+  db_data:
