@@ -438,7 +438,11 @@ gh pr create --base develop
 ルールを守りやすくするため、`main` と `develop` にブランチ保護（Settings → Branches）を設定します。
 
 - 直接 push を禁止し、PR を必須にする（Require a pull request before merging）
-- CI の成功をマージの条件にする（Require status checks to pass before merging）。必須にするチェックは `be-lint` / `be-format` / `be-test` / `be-result`
+  - マージには **1 人以上の承認**を必須にする（Require approvals：1）。PR を出した本人は自分の PR を承認できない
+- CI の成功をマージの条件にする（Require status checks to pass before merging）
+  - 必須にするチェックは `be-lint` / `be-format` / `be-test` / `be-result`。送り元は GitHub Actions に限定する
+  - マージ前にマージ先の最新を取り込んでいることを必須にする（Require branches to be up to date before merging）。他の PR が先にマージされたら、「タスクに対する使用の仕方」の 4 のとおり最新を取り込み、`git push --force-with-lease` で push し直す
+- 管理者にも同じ制限をかける（Do not allow bypassing the above settings）
 - force push と削除を禁止する
 - マージ後に作業用ブランチを自動で削除する（Settings → General → Automatically delete head branches）
 
