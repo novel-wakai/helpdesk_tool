@@ -19,14 +19,15 @@ from app.main import app
 
 if settings.test_mysql_database == settings.mysql_database:
     raise RuntimeError(
-        "TEST_MYSQL_DATABASE が開発用 DB と同じ名前です。開発データを消さないよう、別の名前にしてください。"
+        "TEST_MYSQL_DATABASE が開発用 DB と同じ名前です。"
+        "開発データを消さないよう、別の名前にしてください。"
     )
 
 test_engine = create_engine(settings.test_database_url, pool_pre_ping=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_database() -> Generator[None, None, None]:
+def setup_database() -> Generator[None]:
     Base.metadata.drop_all(test_engine)
     Base.metadata.create_all(test_engine)
     yield
@@ -34,7 +35,7 @@ def setup_database() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def db_session() -> Generator[Session, None, None]:
+def db_session() -> Generator[Session]:
     connection = test_engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection, join_transaction_mode="create_savepoint")
@@ -47,7 +48,7 @@ def db_session() -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def client(db_session: Session) -> Generator[TestClient]:
     app.dependency_overrides[get_db] = lambda: db_session
     with TestClient(app) as test_client:
         yield test_client

@@ -31,4 +31,29 @@ package-mode = false
 dev = [
     "pytest (>=9.2.0,<10.0.0)",
     "httpx2 (>=2.16.2,<3.0.0)",
+    "ruff (>=0.17.6,<0.18.0)",
 ]
+
+[tool.ruff]
+# 1 行の長さ（FE の Prettier と合わせて 100 文字）
+line-length = 100
+target-version = "py313"
+# 自動生成されるマイグレーションファイルは対象外
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle（基本的なスタイルの誤り）
+    "W",  # pycodestyle（警告）
+    "F",  # Pyflakes（未使用の import・変数、未定義の名前など）
+    "I",  # isort（import の並び順）
+    "B",  # flake8-bugbear（よくあるバグのパターン）
+    "UP", # pyupgrade（古い書き方を新しい Python の書き方に）
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI の依存性注入（引数の既定値に Depends() などを書く）は正しい書き方のため、B008 の対象外にする
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]

@@ -28,5 +28,22 @@
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
+    },
+
+    // ===== Backend（helpdesk-be）: Ruff =====
+    // Python の仮想環境として helpdesk-be/.venv を使う（README の手順で作成したもの）
+    "python.defaultInterpreterPath": "${workspaceFolder}/helpdesk-be/.venv/bin/python",
+    // 拡張機能に同梱の Ruff ではなく、仮想環境の Ruff（poetry.lock で固定したバージョン）を使う
+    "ruff.importStrategy": "fromEnvironment",
+
+    // 保存時に Ruff で整形し、自動で直せる指摘と import の並び順を直す
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
     }
 }

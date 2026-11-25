@@ -39,9 +39,7 @@ class Settings(BaseSettings):
 
     @property
     def test_database_url(self) -> str:
-        return self._build_url(
-            self.test_mysql_host, self.test_mysql_port, self.test_mysql_database
-        )
+        return self._build_url(self.test_mysql_host, self.test_mysql_port, self.test_mysql_database)
 
 
 settings = Settings()

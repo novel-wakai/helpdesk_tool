@@ -1,4 +1,4 @@
 {
   // このリポジトリを開いたときに、VS Code がインストールを勧める拡張機能
-  "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+  "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "charliermarsh.ruff"]
 }

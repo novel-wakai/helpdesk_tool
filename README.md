@@ -56,6 +56,7 @@ helpdesk_tool/
 | DB | MySQL 8.0 |
 | パッケージ管理 | Poetry |
 | 実行環境 | Docker / docker compose |
+| Linter / Formatter | Ruff |
 | テスト | pytest（テスト用 DB は Docker で起動） |
 
 ### Frontend（helpdesk-fe）
@@ -144,6 +145,8 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | BE の本番用イメージ作成（本番用パッケージのみ） | `docker build --target prod -t helpdesk-be:prod ./helpdesk-be` | リポジトリ直下 |
 | マイグレーション作成 | `poetry run alembic revision --autogenerate -m "内容"` | helpdesk-be |
 | マイグレーション適用 | `poetry run alembic upgrade head` | helpdesk-be |
+| BE の Lint（問題の検出 / 自動修正） | `make lint` / `make lint-fix` | helpdesk-be |
+| BE の書式（確認 / 自動修正） | `make format-check` / `make format-fix` | helpdesk-be |
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
@@ -152,6 +155,44 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | FE の書式（確認 / 自動修正） | `yarn format:check` / `yarn format:fix` | helpdesk-fe |
 
 ## Linter / Formatter
+
+### Backend（Ruff）
+
+| ツール | 役割 | 設定ファイル |
+|---|---|---|
+| Ruff | コードの問題を見つける（未使用の import・変数、よくあるバグのパターン、import の並び順など）と、書式を自動でそろえる | `helpdesk-be/pyproject.toml`（`[tool.ruff]`） |
+
+#### コマンドで実行する
+
+`helpdesk-be` で実行します（事前に、セットアップの手順でホストの仮想環境を作成し `poetry install` しておく必要があります）。
+
+```bash
+make lint          # 問題を検出する（問題があればエラー終了＝終了コード 0 以外）
+make lint-fix      # 自動で直せる問題を直す
+make format-check  # 書式がそろっているか確認する（ずれがあればエラー終了＝終了コード 0 以外）
+make format-fix    # 書式を自動でそろえる
+make help          # コマンドの一覧を表示する
+```
+
+`make lint-fix` で直らない指摘（未使用の変数など）は、メッセージに従って手で直してください。
+
+コンテナの中で実行することもできます（リポジトリ直下で実行）。
+
+```bash
+docker compose exec be ruff check .
+docker compose exec be ruff format --check .
+```
+
+#### VS Code で使う
+
+1. このリポジトリ（`helpdesk_tool`）を VS Code で開く
+2. 「推奨拡張機能」から、Ruff（`charliermarsh.ruff`）をインストールする
+3. インストール後、コマンドパレット（`Cmd + Shift + P`）で「Developer: Reload Window」を実行する
+
+設定は `.vscode/settings.json` に入っているため、追加の設定は不要です（Python の仮想環境として `helpdesk-be/.venv` を使います）。
+
+- Ruff の指摘が、エディタ上に波線で表示され、「問題」パネルにも一覧で表示されます
+- ファイルを保存すると、Ruff で書式がそろい、自動で直せる問題と import の並び順が直ります
 
 ### Frontend（ESLint / Prettier）
 
@@ -188,11 +229,12 @@ yarn format:fix    # 書式を自動でそろえる
 - ESLint の指摘が、エディタ上に波線で表示され、「問題」パネルにも一覧で表示されます
 - ファイルを保存すると、Prettier で書式がそろい、ESLint で自動修正できる問題が直ります
 
-うまく動かないときは、次を確認してください。
+### VS Code でうまく動かないとき（Backend / Frontend 共通）
 
-- **拡張機能が無効になっていないか**：拡張機能の画面で ESLint / Prettier を開き、「無効」になっていたら「有効にする」の横の ▼ から「有効にする（ワークスペース）」を選ぶ（このプロジェクトだけで有効になります）
+- **拡張機能が無効になっていないか**：拡張機能の画面で Ruff / ESLint / Prettier を開き、「無効」になっていたら「有効にする」の横の ▼ から「有効にする（ワークスペース）」を選ぶ（このプロジェクトだけで有効になります）
 - **`Cmd + S` で保存しているか**：VS Code の自動保存（`files.autoSave`）では整形は動きません
-- 整形の設定（文字数など）は `helpdesk-fe/.prettierrc.json` が優先されるため、VS Code の個人設定の Prettier の値は使われません
+- 整形の設定（文字数など）は各プロジェクトの設定ファイル（`helpdesk-be/pyproject.toml`、`helpdesk-fe/.prettierrc.json`）が優先されるため、VS Code の個人設定の値は使われません
+- **（Backend）Ruff の指摘が出ないとき**：`helpdesk-be/.venv` が作られているか確認する（セットアップの「3. Backend を起動する」の手順）。コマンドパレットの「Python: Select Interpreter」で `helpdesk-be/.venv` を選ぶ
 
 ## ブランチ運用ルール
 

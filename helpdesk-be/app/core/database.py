@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
     """すべてのモデルの基底クラス。"""
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     """リクエストごとに DB セッションを渡す FastAPI の依存関数。"""
     db = SessionLocal()
     try:

@@ -1,7 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
@@ -15,9 +14,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # 接続先はアプリの設定（環境変数 / .env）から取る。alembic.ini には書かない
+import app.models  # noqa: E402,F401  モデルを読み込んで metadata に登録する
 from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
-import app.models  # noqa: E402,F401  モデルを読み込んで metadata に登録する
 
 config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
@@ -67,9 +66,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
