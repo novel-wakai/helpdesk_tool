@@ -277,7 +277,7 @@ git push -u origin feature/12-ticket-list
 gh pr create --base develop
 ```
 
-> **すでに push 済みのブランチで 4 の rebase をした場合**、`git push` はエラーになります（rebase でコミットが作り直され、リモートと履歴が食い違うため）。そのときは `git push --force-with-lease` で push してください。`--force` ではなく `--force-with-lease` を使うと、自分が最後に取得した後にリモートへ別の変更が入っていた場合は push が中止されるため、他の人の変更を誤って消すことがありません。
+> **すでに push 済みのブランチで 4 の rebase をした場合**、`git push` はエラーになります（rebase でコミットが作り直され、リモートと履歴が食い違うため）。そのときは `git push --force-with-lease` で push してください。
 
 - タスクが大きい場合（目安：PR の差分が 500 行を超えそう、または 3 日以上かかりそう）は、タスクを分けてブランチも分ける
 - BE と FE の両方にまたがるタスクは、同じブランチでまとめて PR にしてよい（1 つのリポジトリで管理しているため）
