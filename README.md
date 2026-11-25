@@ -92,8 +92,17 @@ helpdesk_tool/
 
 ```bash
 cp .env.example .env
-# .env のパスワードを任意の値に変更する
 ```
+
+**セキュリティのため、`.env` の `MYSQL_ROOT_PASSWORD` と `MYSQL_PASSWORD` は必ず変更してください。** `.env.example` の値（`change-me` など）は公開されている見本の値です。
+
+```bash
+# ランダムな値の作り方の例（出力された値を .env に貼り付ける）
+openssl rand -hex 16
+```
+
+> **注意**：パスワードの変更は、**最初の `docker compose up` より前**に行ってください。MySQL は初回起動時の値で DB を作るため、起動後に `.env` を変えても DB には反映されず、API が DB に接続できなくなります。
+> 起動後に変更したい場合は、`docker compose down -v`（開発用 DB のデータも削除されます）を実行してから起動し直してください。
 
 ### 3. Backend を起動する（DB と API を Docker で起動）
 
@@ -110,9 +119,8 @@ docker compose up -d --build
 
 ```bash
 cd helpdesk-be
-poetry config virtualenvs.in-project true   # 初回のみ。helpdesk-be/.venv に作られる
 poetry env use python3.13
-poetry install
+poetry install   # helpdesk-be/.venv に作られる（設定は helpdesk-be/poetry.toml に記載済み）
 ```
 
 ### 4. Frontend を起動する
