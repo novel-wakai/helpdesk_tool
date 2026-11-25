@@ -17,8 +17,9 @@
 2. [使用技術](#使用技術)
 3. [セットアップ](#セットアップ)
 4. [よく使うコマンド](#よく使うコマンド)
-5. [ブランチ運用ルール](#ブランチ運用ルール)
-6. [参考資料](#参考資料)
+5. [Linter / Formatter](#linter--formatter)
+6. [ブランチ運用ルール](#ブランチ運用ルール)
+7. [参考資料](#参考資料)
 
 ## システム構成
 
@@ -55,6 +56,7 @@ helpdesk_tool/
 | DB | MySQL 8.0 |
 | パッケージ管理 | Poetry |
 | 実行環境 | Docker / docker compose |
+| Linter / Formatter | Ruff |
 | テスト | pytest（テスト用 DB は Docker で起動） |
 
 ### Frontend（helpdesk-fe）
@@ -68,6 +70,7 @@ helpdesk_tool/
 | HTTP クライアント | Axios |
 | ルーティング | React Router v7 |
 | グラフ描画 | Recharts |
+| Linter / Formatter | ESLint / Prettier |
 | テスト | Vitest + React Testing Library、E2E は Playwright |
 | パッケージ管理 | yarn |
 
@@ -92,8 +95,19 @@ helpdesk_tool/
 
 ```bash
 cp .env.example .env
-# .env のパスワードを任意の値に変更する
 ```
+
+**セキュリティのため、`.env` の `MYSQL_ROOT_PASSWORD` と `MYSQL_PASSWORD` は必ず変更してください。** `.env.example` の値（`change-me` など）は公開されている見本の値です。
+
+```bash
+# ランダムな値の作り方の例（出力された値を .env に貼り付ける）
+openssl rand -hex 16
+```
+
+> **注意**：パスワードに **`$` は使わないでください**。docker compose は `.env` の `$` を変数の印として扱いますが、ホストで直接動かすコマンド（`poetry run alembic` など）は `.env` をそのまま読むため、両者でパスワードが食い違い、DB に接続できなくなります。`@` `%` `/` `#` `:` などの他の記号は使えます。
+
+> **注意**：パスワードの変更は、**最初の `docker compose up` より前**に行ってください。MySQL は初回起動時の値で DB を作るため、起動後に `.env` を変えても DB には反映されず、API が DB に接続できなくなります。
+> 起動後に変更したい場合は、`docker compose down -v`（開発用 DB のデータも削除されます）を実行してから起動し直してください。
 
 ### 3. Backend を起動する（DB と API を Docker で起動）
 
@@ -110,9 +124,8 @@ docker compose up -d --build
 
 ```bash
 cd helpdesk-be
-poetry config virtualenvs.in-project true   # 初回のみ。helpdesk-be/.venv に作られる
 poetry env use python3.13
-poetry install
+poetry install   # helpdesk-be/.venv に作られる（設定は helpdesk-be/poetry.toml に記載済み）
 ```
 
 ### 4. Frontend を起動する
@@ -134,10 +147,96 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | BE の本番用イメージ作成（本番用パッケージのみ） | `docker build --target prod -t helpdesk-be:prod ./helpdesk-be` | リポジトリ直下 |
 | マイグレーション作成 | `poetry run alembic revision --autogenerate -m "内容"` | helpdesk-be |
 | マイグレーション適用 | `poetry run alembic upgrade head` | helpdesk-be |
+| BE の Lint（問題の検出 / 自動修正） | `make lint` / `make lint-fix` | helpdesk-be |
+| BE の書式（確認 / 自動修正） | `make format-check` / `make format-fix` | helpdesk-be |
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
-| E2E テスト | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+| E2E テスト（BE を起動した状態で実行） | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+| FE の Lint（問題の検出 / 自動修正） | `yarn lint` / `yarn lint:fix` | helpdesk-fe |
+| FE の書式（確認 / 自動修正） | `yarn format:check` / `yarn format:fix` | helpdesk-fe |
+
+## Linter / Formatter
+
+### Backend（Ruff）
+
+| ツール | 役割 | 設定ファイル |
+|---|---|---|
+| Ruff | コードの問題を見つける（未使用の import・変数、よくあるバグのパターン、import の並び順など）と、書式を自動でそろえる | `helpdesk-be/pyproject.toml`（`[tool.ruff]`） |
+
+#### コマンドで実行する
+
+`helpdesk-be` で実行します（事前に、セットアップの手順でホストの仮想環境を作成し `poetry install` しておく必要があります）。
+
+```bash
+make lint          # 問題を検出する（問題があればエラー終了＝終了コード 0 以外）
+make lint-fix      # 自動で直せる問題を直す
+make format-check  # 書式がそろっているか確認する（ずれがあればエラー終了＝終了コード 0 以外）
+make format-fix    # 書式を自動でそろえる
+make help          # コマンドの一覧を表示する
+```
+
+`make lint-fix` で直らない指摘（未使用の変数など）は、メッセージに従って手で直してください。
+
+コンテナの中で実行することもできます（リポジトリ直下で実行）。
+
+```bash
+docker compose exec be ruff check .
+docker compose exec be ruff format --check .
+```
+
+#### VS Code で使う
+
+1. このリポジトリ（`helpdesk_tool`）を VS Code で開く
+2. 「推奨拡張機能」から、Ruff（`charliermarsh.ruff`）をインストールする
+3. インストール後、コマンドパレット（`Cmd + Shift + P`）で「Developer: Reload Window」を実行する
+
+設定は `.vscode/settings.json` に入っているため、追加の設定は不要です（Python の仮想環境として `helpdesk-be/.venv` を使います）。
+
+- Ruff の指摘が、エディタ上に波線で表示され、「問題」パネルにも一覧で表示されます
+- ファイルを保存すると、Ruff で書式がそろい、自動で直せる問題と import の並び順が直ります
+
+### Frontend（ESLint / Prettier）
+
+| ツール | 役割 | 設定ファイル |
+|---|---|---|
+| ESLint | コードの問題を見つける（未使用の変数、React のフックの誤った使い方など） | `helpdesk-fe/eslint.config.js` |
+| Prettier | 書式を自動でそろえる（引用符、セミコロン、改行など） | `helpdesk-fe/.prettierrc.json` |
+
+書式に関するルールは Prettier に任せ、ESLint 側では無効にしています（`eslint-config-prettier`）。両方を実行しても指摘がぶつかりません。
+
+#### コマンドで実行する
+
+`helpdesk-fe` で実行します（事前に `yarn install` が必要です）。
+
+```bash
+yarn lint          # 問題を検出する（問題があれば終了コード 1）
+yarn lint:fix      # 自動で直せる問題を直す
+yarn format:check  # 書式がそろっているか確認する（ずれがあれば終了コード 1）
+yarn format:fix    # 書式を自動でそろえる
+```
+
+`yarn lint:fix` で直らない指摘（未使用の変数、フックの呼び出し位置など）は、メッセージに従って手で直してください。
+
+#### VS Code で使う
+
+1. このリポジトリ（`helpdesk_tool`）を VS Code で開く
+2. 右下に表示される「推奨拡張機能」から、次の 2 つをインストールする（拡張機能の画面で `@recommended` と検索しても表示されます）
+   - ESLint（`dbaeumer.vscode-eslint`）
+   - Prettier - Code formatter（`esbenp.prettier-vscode`）
+3. インストール後、コマンドパレット（`Cmd + Shift + P`）で「Developer: Reload Window」を実行する
+
+設定は `.vscode/settings.json` に入っているため、追加の設定は不要です。
+
+- ESLint の指摘が、エディタ上に波線で表示され、「問題」パネルにも一覧で表示されます
+- ファイルを保存すると、Prettier で書式がそろい、ESLint で自動修正できる問題が直ります
+
+### VS Code でうまく動かないとき（Backend / Frontend 共通）
+
+- **拡張機能が無効になっていないか**：拡張機能の画面で Ruff / ESLint / Prettier を開き、「無効」になっていたら「有効にする」の横の ▼ から「有効にする（ワークスペース）」を選ぶ（このプロジェクトだけで有効になります）
+- **`Cmd + S` で保存しているか**：VS Code の自動保存（`files.autoSave`）では整形は動きません
+- 整形の設定（文字数など）は各プロジェクトの設定ファイル（`helpdesk-be/pyproject.toml`、`helpdesk-fe/.prettierrc.json`）が優先されるため、VS Code の個人設定の値は使われません
+- **（Backend）Ruff の指摘が出ないとき**：`helpdesk-be/.venv` が作られているか確認する（セットアップの「3. Backend を起動する」の手順）。コマンドパレットの「Python: Select Interpreter」で `helpdesk-be/.venv` を選ぶ
 
 ## ブランチ運用ルール
 
