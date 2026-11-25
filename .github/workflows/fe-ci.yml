@@ -4,7 +4,7 @@
 #   - lint   : ESLint で問題を検出する（yarn lint と同じ）
 #   - format : Prettier で書式がそろっているか確認する（yarn format:check と同じ）
 #   - test   : Vitest で単体テストを実行する（yarn test と同じ）
-#   - build  : 型チェックと本番用のビルドを行う（yarn build と同じ）。
+#   - build  : 型チェックと本番用のビルドを行う（yarn build と同じ内容を 2 ステップに分けて実行）。
 #              Vitest は型チェックをしないため、型の誤りはここで見つける
 # 最後に result で、上の結果をまとめて判定する。
 #
@@ -139,8 +139,15 @@ jobs:
           cache-dependency-path: helpdesk-fe/yarn.lock
       - name: パッケージをインストール
         run: yarn install --frozen-lockfile
-      - name: 型チェックと本番用のビルドを行う
-        run: yarn build
+      # yarn build（tsc -b && vite build）と同じことを 2 つに分けて行う。
+      # 型チェックはリポジトリ直下から実行し、エラーのパスを helpdesk-fe/src/... の形にする。
+      # helpdesk-fe で実行すると src/... の形になり、GitHub がファイルを見つけられず、
+      # 型エラーが PR のコード上に表示されないため
+      - name: 型チェックを行う
+        working-directory: .
+        run: helpdesk-fe/node_modules/.bin/tsc -b helpdesk-fe
+      - name: 本番用のビルドを行う
+        run: yarn vite build
 
   # 上のジョブの結果をまとめて判定する
   # fe-changes が失敗すると lint / format / test / build は「スキップ」になり、GitHub はスキップを
