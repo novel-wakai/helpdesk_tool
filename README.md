@@ -17,7 +17,8 @@
 2. [使用技術](#使用技術)
 3. [セットアップ](#セットアップ)
 4. [よく使うコマンド](#よく使うコマンド)
-5. [参考資料](#参考資料)
+5. [ブランチ運用ルール](#ブランチ運用ルール)
+6. [参考資料](#参考資料)
 
 ## システム構成
 
@@ -137,6 +138,176 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
 | E2E テスト | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+
+## ブランチ運用ルール
+
+`main` と `develop` の 2 本を常設し、作業はすべて作業用ブランチで行います。作業用ブランチはプルリクエスト（PR）でマージします。
+
+### ブランチの種類
+
+| ブランチ | 概要 | 作成元 | マージ先 | 寿命 |
+|---|---|---|---|---|
+| `main` | リリースできる状態のコード。常に動く状態を保つ | － | － | 常設 |
+| `develop` | 開発中の機能を統合するブランチ。次のリリースの候補 | `main` | `main` | 常設 |
+| `feature/*` | 新機能の追加 | `develop` | `develop` | マージ後に削除 |
+| `fix/*` | `develop` 上で見つかった不具合の修正 | `develop` | `develop` | マージ後に削除 |
+| `hotfix/*` | `main`（リリース済み）の緊急修正 | `main` | `main` と `develop` | マージ後に削除 |
+| `docs/*` | README などドキュメントだけの変更 | `develop` | `develop` | マージ後に削除 |
+| `chore/*` | 設定・依存パッケージの更新など、機能に影響しない変更 | `develop` | `develop` | マージ後に削除 |
+
+### ブランチ名の命名規則
+
+```
+<種類>/<タスク番号>-<短い説明>
+```
+
+| 要素 | ルール | 例 |
+|---|---|---|
+| 種類 | `feature` / `fix` / `hotfix` / `docs` / `chore` のいずれか | `feature` |
+| タスク番号 | GitHub Issue の番号。番号がない作業は省略してよい | `12` |
+| 短い説明 | 英小文字・数字・ハイフンのみ。内容がわかる 2〜5 語程度 | `ticket-list` |
+
+- 全体で 50 文字以内にする
+- 日本語、大文字、スペース、アンダースコア（`_`）は使わない
+
+| 良い例 | 悪い例 | 理由 |
+|---|---|---|
+| `feature/12-ticket-list` | `feature/チケット一覧` | 日本語は使わない |
+| `fix/20-status-label` | `Fix/20_Status_Label` | 大文字・アンダースコアは使わない |
+| `hotfix/31-login-error` | `hotfix/fix` | 何の修正かわからない |
+| `docs/update-readme` | `my-work` | 種類がない、作業内容がわからない |
+
+### マージ・被マージの流れ
+
+```mermaid
+flowchart LR
+  F["feature/*<br>fix/*<br>docs/*<br>chore/*"] -- "PR（Squash merge）" --> D[develop]
+  D -- "PR（Merge commit）<br>＋タグ付け" --> M[main]
+  M -- "作成" --> H[hotfix/*]
+  H -- "PR（Merge commit）<br>＋タグ付け" --> M
+  H -- "PR（Merge commit）" --> D
+```
+
+| マージする側 | マージされる側 | 方法 | 補足 |
+|---|---|---|---|
+| `feature/*` `fix/*` `docs/*` `chore/*` | `develop` | Squash merge | 1 タスク = 1 コミットにまとまる |
+| `develop` | `main` | Merge commit | マージ後にタグを付ける |
+| `hotfix/*` | `main` | Merge commit | マージ後にタグを付ける |
+| `hotfix/*` | `develop` | Merge commit | `main` と `develop` の差を作らないため、必ず両方に入れる |
+
+時間の流れで見ると、次のようになります。
+
+```mermaid
+gitGraph
+  commit id: "initial"
+  branch develop
+  checkout develop
+  commit id: "setup"
+  branch feature/12-ticket-list
+  checkout feature/12-ticket-list
+  commit id: "一覧 API"
+  commit id: "一覧画面"
+  checkout develop
+  merge feature/12-ticket-list
+  branch fix/20-status-label
+  checkout fix/20-status-label
+  commit id: "表示名の修正"
+  checkout develop
+  merge fix/20-status-label
+  checkout main
+  merge develop tag: "v0.1.0"
+  branch hotfix/31-login-error
+  checkout hotfix/31-login-error
+  commit id: "ログイン不具合の修正"
+  checkout main
+  merge hotfix/31-login-error tag: "v0.1.1"
+  checkout develop
+  merge hotfix/31-login-error
+```
+
+### 使用時のルール
+
+#### main
+
+- 直接コミット・直接 push はしない。`develop` または `hotfix/*` からの PR でのみ更新する
+- マージしたらリリース番号のタグを付ける（例：`v0.1.0`）
+- マージ方法は **Merge commit**（履歴をまとめずに残す）
+
+#### develop
+
+- 直接コミット・直接 push はしない。作業用ブランチからの PR でのみ更新する
+- 常にビルドとテストが通る状態を保つ
+- 区切りのよいところ（機能のまとまりができたとき）で `main` への PR を作る
+
+#### 作業用ブランチ（feature / fix / hotfix / docs / chore）
+
+- 作る前に作成元のブランチを最新にする
+- 自分のブランチは何度コミットしてもよい。PR を出す前に作成元の最新を取り込む
+- PR を出す条件
+  - BE のテスト（`docker compose exec be pytest`）が通っている
+  - FE のビルドとテスト（`yarn build` / `yarn test`）が通っている
+  - PR の説明に「何をしたか」「どう確認したか」を書いている
+- マージ方法はブランチの種類で異なる
+  - `feature/*` `fix/*` `docs/*` `chore/*` → `develop`：**Squash merge**（1 つの PR が `develop` 上で 1 コミットになる）
+  - `hotfix/*` → `main` / `develop`：**Merge commit**（`main` と `develop` に同じコミットを入れ、両者の差を作らないため）
+- マージしたらブランチを削除する
+
+### タスクに対する使用の仕方
+
+**1 タスク = 1 ブランチ = 1 PR** を基本にします。
+
+```bash
+# 1. 作成元を最新にする
+git switch develop
+git pull
+
+# 2. タスク用のブランチを作る
+git switch -c feature/12-ticket-list
+
+# 3. 作業してコミットする（何回でもよい）
+git add .
+git commit -m "チケット一覧 API を追加"
+
+# 4. PR の前に develop の最新を取り込む
+git fetch origin
+git rebase origin/develop
+
+# 5. push して PR を作る（マージ先は develop）
+git push -u origin feature/12-ticket-list
+gh pr create --base develop
+```
+
+> **すでに push 済みのブランチで 4 の rebase をした場合**、`git push` はエラーになります（rebase でコミットが作り直され、リモートと履歴が食い違うため）。そのときは `git push --force-with-lease` で push してください。
+
+- タスクが大きい場合（目安：PR の差分が 500 行を超えそう、または 3 日以上かかりそう）は、タスクを分けてブランチも分ける
+- BE と FE の両方にまたがるタスクは、同じブランチでまとめて PR にしてよい（1 つのリポジトリで管理しているため）
+- 作業中に別の不具合を見つけたら、今のブランチでは直さず、別のタスク・別のブランチにする
+
+### 禁止事項
+
+- `main` と `develop` への直接コミット・直接 push
+- `main` と `develop` への force push（`git push --force`）
+- 1 つのブランチに複数のタスクを混ぜること
+- 他の人のブランチに、本人の了承なく push すること
+- テストやビルドが失敗したままのマージ
+- 秘密情報（`.env`、パスワード、API キーなど）や非公開資料（`helpdesk_overview.md`、`Novel HELPDESK - Sample.pdf`）のコミット
+- マージ済みのブランチを再利用して、別の作業を続けること
+
+### 例外
+
+| ケース | 扱い |
+|---|---|
+| リポジトリの最初のコミット | `main` に直接コミットし、そこから `develop` を作成する |
+| 自分専用の作業用ブランチでの force push | `git rebase` 後に限り `git push --force-with-lease` を使ってよい |
+| リリース済みの環境で緊急の不具合 | `develop` を経由せず、`main` から `hotfix/*` を作る |
+
+### GitHub の推奨設定
+
+ルールを守りやすくするため、`main` と `develop` にブランチ保護（Settings → Branches）を設定します。
+
+- 直接 push を禁止し、PR を必須にする（Require a pull request before merging）
+- force push と削除を禁止する
+- マージ後に作業用ブランチを自動で削除する（Settings → General → Automatically delete head branches）
 
 ## 参考資料
 
