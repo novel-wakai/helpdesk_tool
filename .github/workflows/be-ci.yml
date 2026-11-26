@@ -48,7 +48,9 @@ jobs:
         working-directory: .
     steps:
       - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      # 外部の作者のアクションは、タグの付け替えによるすり替え（サプライチェーン攻撃）を防ぐため、
+      # コミット SHA で指定する（コメントは対応するバージョン）
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           # 比べる相手
