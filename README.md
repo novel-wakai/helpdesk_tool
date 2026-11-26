@@ -263,13 +263,39 @@ GitHub Actions で、ブランチへの push と PR のたびに Lint・書式�
 - CI の MySQL は CI 専用の使い捨てです。ワークフローに書いてあるパスワードは CI でしか使わないため、公開されていても問題ありません
 - CI の MySQL の文字コードと照合順序（`utf8mb4` / `utf8mb4_unicode_ci`）は、`docker-compose.yml` の `db-test` とそろえています
 
+### Frontend（helpdesk-fe）
+
+設定ファイル：`.github/workflows/fe-ci.yml`（PR 画面での表示名は `FE CI`）
+
+| チェック | 内容 | ローカルで同じことをするコマンド（helpdesk-fe で実行） |
+|---|---|---|
+| `fe-check` | 次の 4 つを順に実行する（ステップ名の先頭に Lint / Format / Test / Build と表示） | － |
+| 　Lint | ESLint で問題を検出する | `yarn lint` |
+| 　Format | Prettier で書式がそろっているか確認する | `yarn format:check` |
+| 　Test | Vitest で単体テストを実行する | `yarn test` |
+| 　Build | 型チェックと本番用のビルドを行う（Vitest は型チェックをしないため、型の誤りはここで見つける） | `yarn build` |
+| `fe-result` | `fe-check`（と、変更の判定 `fe-changes`）の結果をまとめ、失敗・中断があれば失敗にする | － |
+
+- 4 つのチェック自体は合計 10 秒ほどで、時間の大半は準備（`yarn install` など）のため、準備を 1 回で済ませるよう 1 つのジョブ `fe-check` にまとめています
+  - 1 つのチェックが失敗しても、残りのチェックも実行します（1 回の実行で、すべての問題が分かります）
+  - どれが失敗したかは、`fe-check` の「Details」を開くと、❌ が付いたステップで分かります
+- Node.js のバージョンは `helpdesk-fe/.nvmrc` を使います（ローカルと同じ）
+- パッケージは `yarn install --frozen-lockfile` で入れます。`package.json` を変えたのに `yarn.lock` を更新し忘れていると失敗します（`yarn install` を実行して `yarn.lock` もコミットしてください）
+- E2E テスト（`yarn test:e2e`）は BE を起動した状態で動かす前提のため、CI では実行しません。PR を出す前にローカルで確認してください
+- `helpdesk-fe/` に変更がない push・PR（BE だけの変更など）では、`fe-check` はスキップされます。スキップは「成功」扱いのため、マージは止まりません
+  - PR では、マージ先のブランチとの差分で判定します
+  - push では、`develop` から分かれた後の変更で判定します（`develop` 自身への push は、push の直前との差分）
+- `fe-result` は、変更の判定（`fe-changes`）が失敗したときに、検査がスキップされたままマージされるのを防ぐためのチェックです
+
 ### 結果の見方と、失敗したとき
 
 1. PR 画面の下部（Checks）に、チェックごとの結果（✅ / ❌）が表示されます
-2. ❌ の横の「Details」を開くと、どこで失敗したかのログが見られます（Lint の指摘は、PR の「Files changed」のコード上にも表示されます）
+2. ❌ の横の「Details」を開くと、どこで失敗したかのログが見られます。次の指摘は、PR の「Files changed」のコード上にも表示されます
+   - BE：Ruff（Lint）の指摘
+   - FE：ESLint の指摘、型エラー、失敗したテスト
 3. 上の表のコマンドをローカルで実行して直し、もう一度 push すると、CI が自動で再実行されます
 
-書式の失敗は `make format-fix`、Lint の失敗の多くは `make lint-fix` で直せます。
+書式の失敗は BE なら `make format-fix`、FE なら `yarn format:fix` で直せます。Lint の失敗の多くは、BE なら `make lint-fix`、FE なら `yarn lint:fix` で直せます。
 
 ## ブランチ運用ルール
 
@@ -440,7 +466,7 @@ gh pr create --base develop
 - 直接 push を禁止し、PR を必須にする（Require a pull request before merging）
   - レビューの承認はマージの条件にしない（Require approvals はオフ）。レビューは PR 上で行うが、マージを止めるのは CI の結果のみ
 - CI の成功をマージの条件にする（Require status checks to pass before merging）
-  - 必須にするチェックは `be-lint` / `be-format` / `be-test` / `be-result`。送り元は GitHub Actions に限定する
+  - 必須にするチェックは、BE が `be-lint` / `be-format` / `be-test` / `be-result`、FE が `fe-check` / `fe-result`。送り元は GitHub Actions に限定する
   - マージ前にマージ先の最新を取り込んでいることを必須にする（Require branches to be up to date before merging）。他の PR が先にマージされたら、「タスクに対する使用の仕方」の 4 のとおり最新を取り込み、`git push --force-with-lease` で push し直す
 - 管理者にも同じ制限をかける（Do not allow bypassing the above settings）
 - force push と削除を禁止する
