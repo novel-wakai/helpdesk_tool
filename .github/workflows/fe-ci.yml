@@ -17,6 +17,10 @@
 # FE に変更がないとき（BE だけの変更など）は、check をスキップする。
 # スキップされたジョブは GitHub 上で「成功」扱いになるため、マージは止まらない。
 # （ワークフロー自体を paths で絞ると、チェックが届かずマージできなくなるため、この方式にしている）
+#
+# 使用するアクションは、タグの付け替えによるすり替え（サプライチェーン攻撃）を防ぐため、
+# 公式のもの（actions/*）も含めてすべてコミット SHA で指定する（後ろのコメントは対応するバージョン）。
+# 版を上げるときは、新しい版のタグが指すコミットの SHA を本家のリポジトリで確認して書き換える
 
 name: FE CI
 
@@ -55,9 +59,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/checkout@v7
-      # 外部の作者のアクションは、タグの付け替えによるすり替え（サプライチェーン攻撃）を防ぐため、
-      # コミット SHA で指定する（コメントは対応するバージョン）
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
@@ -79,10 +81,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Node.js のバージョンは helpdesk-fe/.nvmrc（ローカルと同じ）を使う。
       # setup-node は ESLint / TypeScript のエラーを PR のコード上に表示する仕組みも登録する
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: helpdesk-fe/.nvmrc
           cache: yarn
