@@ -23,5 +23,6 @@ format-check: ## 書式がそろっているか確認する（ずれがあれば
 format-fix: ## 書式を自動でそろえる
 	$(RUFF) format .
 
-seed: ## 開発用のテストユーザーを作る（開発環境専用。先に alembic upgrade head を実行する）
+seed: ## 開発用のテストユーザーとテストチケットを作る（開発環境専用。先に alembic upgrade head を実行する）
 	poetry run python -m scripts.seed_dev_users
+	poetry run python -m scripts.seed_dev_tickets
