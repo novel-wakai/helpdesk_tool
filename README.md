@@ -134,11 +134,11 @@ poetry env use python3.13
 poetry install   # helpdesk-be/.venv に作られる（設定は helpdesk-be/poetry.toml に記載済み）
 ```
 
-続けて、開発用 DB にテーブルを作り、ログインに使うテストユーザーを登録します（どちらも helpdesk-be で実行します）。
+続けて、開発用 DB にテーブルを作り、ログインに使うテストユーザーと、確認用のテストチケットを登録します（どちらも helpdesk-be で実行します）。
 
 ```bash
 poetry run alembic upgrade head   # テーブルを作る（最新のマイグレーションまで適用する）
-make seed                         # テストユーザーを作る（作成済みのユーザーは飛ばす）
+make seed                         # テストユーザーとテストチケット（10 件）を作る（作成済みのものは飛ばす）
 ```
 
 | メールアドレス | パスワード | アカウントタイプ |
@@ -146,6 +146,7 @@ make seed                         # テストユーザーを作る（作成済�
 | aaa@example.com | Password123 | 社員 |
 | bbb@example.com | Password123 | サポート担当 |
 | ccc@example.com | Password123 | 管理者 |
+| ddd@example.com | Password123 | 社員（他人の非公開チケットが見えないことを確かめるための 2 人目） |
 
 > **注意**：テストユーザーは開発環境専用です。パスワードが公開されているため、本番の DB では `make seed` を実行しないでください（`.env` の `APP_ENV` が `development` でなければ、実行しても何もせずに止まります）。
 
@@ -168,7 +169,7 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | BE の本番用イメージ作成（本番用パッケージのみ） | `docker build --target prod -t helpdesk-be:prod ./helpdesk-be` | リポジトリ直下 |
 | マイグレーション作成 | `poetry run alembic revision --autogenerate -m "内容"` | helpdesk-be |
 | マイグレーション適用 | `poetry run alembic upgrade head` | helpdesk-be |
-| テストユーザーの作成（開発環境専用） | `make seed` | helpdesk-be |
+| テストユーザーとテストチケットの作成（開発環境専用） | `make seed` | helpdesk-be |
 | BE の Lint（問題の検出 / 自動修正） | `make lint` / `make lint-fix` | helpdesk-be |
 | BE の書式（確認 / 自動修正） | `make format-check` / `make format-fix` | helpdesk-be |
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |

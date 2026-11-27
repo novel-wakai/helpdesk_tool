@@ -3,7 +3,8 @@
 使い方: helpdesk-be で `make seed`
 （事前に `poetry run alembic upgrade head` でテーブルを作っておく）
 
-- 社員・サポート担当・管理者を 1 人ずつ作る。パスワードはすべて DEV_PASSWORD
+- 社員 2 人・サポート担当・管理者を作る。パスワードはすべて DEV_PASSWORD
+  （社員が 2 人いるのは、他人の非公開チケットが見えないことを確かめるため）
 - 同じメールアドレスのユーザーがすでにいれば、作らずに飛ばす（何度実行してもよい）
 - 本番用の Docker イメージには、このフォルダ（scripts/）を含めていない
 - .env の APP_ENV が development でなければ、何もせずに止まる
@@ -29,19 +30,27 @@ DEV_USERS = [
     {"display_name": "Test.Employee", "email": "aaa@example.com", "role": UserRole.EMPLOYEE},
     {"display_name": "Test.Support", "email": "bbb@example.com", "role": UserRole.SUPPORT},
     {"display_name": "Test.Admin", "email": "ccc@example.com", "role": UserRole.ADMIN},
+    {"display_name": "Test.Employee2", "email": "ddd@example.com", "role": UserRole.EMPLOYEE},
 ]
 
 
-def main() -> None:
-    # 接続先のホスト名では判断しない（本番でも DB のサービス名が db などになり得るため）。
-    # .env で APP_ENV=development と明示したときだけ実行する
+def require_development() -> None:
+    """APP_ENV が development でなければ、何もせずに止める（開発用のデータを本番の DB に作らない）。
+
+    接続先のホスト名では判断しない（本番でも DB のサービス名が db などになり得るため）。
+    .env で APP_ENV=development と明示したときだけ実行する
+    """
     if settings.app_env != "development":
         print(
             f"中止しました：APP_ENV が development ではありません（APP_ENV={settings.app_env}）。"
-            "テストユーザーは開発環境でだけ作れます",
+            "開発用のデータは開発環境でだけ作れます",
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def main() -> None:
+    require_development()
     # テストユーザーのパスワードも、パスワードの決まりに合わせる
     errors = password_policy_errors(DEV_PASSWORD)
     if errors:
