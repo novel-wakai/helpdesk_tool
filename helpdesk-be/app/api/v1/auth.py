@@ -45,7 +45,10 @@ COOKIE_OPTIONS = {
 def login(
     body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)
 ) -> User | JSONResponse:
-    """メールアドレスとパスワードでログインし、JWT を Cookie に保存する。"""
+    """メールアドレスとパスワードでログインし、JWT を Cookie に保存する。
+
+    ログイン不要：ログインするための API のため。
+    """
     client_ip = request.client.host if request.client else None
     try:
         user = authenticate(db, body.email, body.password, client_ip)
@@ -86,6 +89,8 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 
     世代番号を上げるため、ほかの端末（ブラウザ）のログインも切れる。
     ログインしていない・トークンが無効なときも、Cookie を消して 204 を返す。
+
+    ログイン不要：ログインが切れた・トークンが無効なときでも、Cookie を消せるようにするため。
     """
     access_token = request.cookies.get(access_token_cookie_name())
     payload = decode_access_token(access_token) if access_token else None
