@@ -27,11 +27,15 @@ test('アプリを開くと、ログイン画面が表示される（受け入�
   await screenshot(page, '01-login')
 })
 
-test('ログインしていないときにチケット一覧を開くと、ログイン画面に移る', async ({ page }) => {
-  await page.goto('/tickets')
+// ログインが必要なページと、存在しない URL（受け入れ要件：ログインしていなければ、すべてログイン画面へ）
+for (const path of ['/tickets', '/not-found']) {
+  test(`ログインしていないときに ${path} を開くと、ログイン画面に移る`, async ({ page }) => {
+    await page.goto(path)
 
-  await expect(page).toHaveURL('/login')
-})
+    await expect(page).toHaveURL('/login')
+    await expect(page.getByRole('heading', { name: 'ログイン' })).toBeVisible()
+  })
+}
 
 test('メールアドレスまたはパスワードが間違っていると、エラーメッセージが表示される（受け入れ要件 4）', async ({
   page,

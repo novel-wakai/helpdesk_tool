@@ -44,7 +44,9 @@ async def add_security_headers(
 
 
 def create_app() -> FastAPI:
-    # API の説明画面は、設定で有効にしたときだけ表示する（既定は表示しない）
+    # API の説明画面は、設定で有効にしたときだけ表示する（既定は表示しない）。
+    # 説明画面はログインなしで見られる（API の一覧を開発中に確かめるため）。
+    # 有効にするのは開発環境だけにする
     docs_enabled = settings.enable_api_docs
     app = FastAPI(
         title="Novel HELPDESK API",
