@@ -1,4 +1,4 @@
-# Backend の Linter / Formatter（Ruff）を実行するコマンド
+# Backend の開発用コマンド（Linter / Formatter の実行、テストユーザーの作成）
 # 使い方: helpdesk-be で `make lint` などを実行する（事前に `poetry install` が必要）
 
 # 別の仮想環境が有効になっていても、このプロジェクトの仮想環境（helpdesk-be/.venv）を使う
@@ -6,7 +6,7 @@ unexport VIRTUAL_ENV
 
 RUFF := poetry run ruff
 
-.PHONY: help lint lint-fix format-check format-fix
+.PHONY: help lint lint-fix format-check format-fix seed
 
 help: ## コマンドの一覧を表示する
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  make %-14s %s\n", $$1, $$2}'
@@ -22,3 +22,6 @@ format-check: ## 書式がそろっているか確認する（ずれがあれば
 
 format-fix: ## 書式を自動でそろえる
 	$(RUFF) format .
+
+seed: ## 開発用のテストユーザーを作る（開発環境専用。先に alembic upgrade head を実行する）
+	poetry run python -m scripts.seed_dev_users

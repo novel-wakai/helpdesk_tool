@@ -14,7 +14,10 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      # 起動の確認は TCP（127.0.0.1）で行う。MySQL は初回起動時に初期設定用の仮サーバーを
+      # ソケット接続だけで立ち上げてから、本番のサーバーに切り替える。localhost（ソケット）で確認すると
+      # 仮サーバーにも応答してしまい、切り替え中に be が起動して DB に接続できないことがある
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -34,7 +37,8 @@ services:
     tmpfs:
       - /var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      # 起動の確認は TCP（127.0.0.1）で行う（理由は db と同じ）
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20

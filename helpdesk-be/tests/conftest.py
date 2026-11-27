@@ -9,12 +9,11 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  モデルを読み込んで metadata に登録する
 from app.core.config import settings
-from app.core.database import Base, get_db
+from app.core.database import Base, create_db_engine, get_db
 from app.main import app
 
 if settings.test_mysql_database == settings.mysql_database:
@@ -23,7 +22,7 @@ if settings.test_mysql_database == settings.mysql_database:
         "開発データを消さないよう、別の名前にしてください。"
     )
 
-test_engine = create_engine(settings.test_database_url, pool_pre_ping=True)
+test_engine = create_db_engine(settings.test_database_url)
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -141,6 +141,8 @@ jobs:
       TEST_MYSQL_DATABASE: helpdesk_test
       TEST_MYSQL_HOST: 127.0.0.1
       TEST_MYSQL_PORT: 3306
+      # ログイン用トークン（JWT）の署名に使う値。CI のテスト専用のため、公開してよい固定値を使う
+      JWT_SECRET_KEY: ci-jwt-secret-key-for-tests-only-0123456789
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # services では MySQL の起動オプションを渡せないため、起動後に docker-compose.yml の db-test と
