@@ -1,0 +1,24 @@
+import { Portal, Stack, Toaster as ChakraToaster, Toast } from '@chakra-ui/react'
+
+import { toaster } from './toaster'
+
+/**
+ * トーストを表示する場所。アプリで 1 つだけ置く。
+ * 1 つ 1 つのトーストは読み上げソフトにも伝わる（通常は role="status"。エラーは role="alert" で、すぐに読み上げる）。
+ */
+export const AppToaster = () => (
+  <Portal>
+    <ChakraToaster toaster={toaster} insetInline={{ mdDown: '4' }}>
+      {(toast) => (
+        <Toast.Root width={{ md: 'sm' }} role={toast.type === 'error' ? 'alert' : 'status'}>
+          <Toast.Indicator />
+          <Stack gap="1" flex="1" maxWidth="100%">
+            {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
+            {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
+          </Stack>
+          <Toast.CloseTrigger />
+        </Toast.Root>
+      )}
+    </ChakraToaster>
+  </Portal>
+)

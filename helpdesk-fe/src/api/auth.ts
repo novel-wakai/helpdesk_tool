@@ -36,3 +36,19 @@ export const fetchCurrentUser = async (): Promise<User | null> => {
     throw error
   }
 }
+
+/**
+ * ログアウトする。BE が Cookie を消し、このユーザーに発行済みのトークンをすべて使えなくする
+ * （ほかのタブ・端末のログインも切れる）。
+ * すでにログインが切れている（401）ときは、ログアウトできたものとして扱う。
+ */
+export const logout = async (): Promise<void> => {
+  try {
+    await apiClient.post('/auth/logout')
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) {
+      return
+    }
+    throw error
+  }
+}

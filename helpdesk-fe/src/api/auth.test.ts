@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { httpError, networkError } from '../test/axiosError'
-import { fetchCurrentUser, type User } from './auth'
+import { fetchCurrentUser, logout, type User } from './auth'
 import { apiClient } from './client'
 
 const user: User = {
@@ -36,5 +36,29 @@ describe('fetchCurrentUser', () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(error)
 
     await expect(fetchCurrentUser()).rejects.toBe(error)
+  })
+})
+
+describe('logout', () => {
+  it('ログアウトの API を、本文なしで呼ぶ', async () => {
+    vi.spyOn(apiClient, 'post').mockResolvedValue({ data: undefined })
+
+    await expect(logout()).resolves.toBeUndefined()
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/logout')
+  })
+
+  it('すでにログインが切れている（401）ときは、ログアウトできたものとして扱う', async () => {
+    vi.spyOn(apiClient, 'post').mockRejectedValue(httpError(401))
+
+    await expect(logout()).resolves.toBeUndefined()
+  })
+
+  it.each([
+    ['500', httpError(500)],
+    ['接続できない', networkError()],
+  ])('%s のときはエラーにする（ログアウトできたと決めつけない）', async (_, error) => {
+    vi.spyOn(apiClient, 'post').mockRejectedValue(error)
+
+    await expect(logout()).rejects.toBe(error)
   })
 })
