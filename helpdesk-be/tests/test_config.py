@@ -89,7 +89,7 @@ def test_cookie_secure_is_enabled_by_default() -> None:
         pytest.param(
             "change-me-to-a-random-value-of-32-chars", "見本の値のまま", id="example-like"
         ),
-        pytest.param("short-secret", "at least 32 characters", id="too-short"),
+        pytest.param("short-secret", "32 文字以上", id="too-short"),
     ],
 )
 def test_jwt_secret_key_rejects_unsafe_values(secret: str, message: str) -> None:
@@ -128,3 +128,61 @@ def test_cors_origins_from_env_json(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert loaded.cors_origins == ["https://helpdesk.example.com", "https://b.example.com"]
+
+
+def test_secrets_are_hidden_when_settings_are_printed() -> None:
+    """settings を表示（repr・str）しても、DB のパスワードと JWT の署名キーが出ないこと。
+
+    テストが失敗したときの表示や、ログに settings を出してしまったときに、秘密の値が漏れないように。
+    """
+    password = "db-password-should-not-appear"
+    jwt_secret_key = "jwt-secret-should-not-appear-0123456789"
+    loaded = make_settings(password, jwt_secret_key=jwt_secret_key)
+
+    shown = repr(loaded) + str(loaded) + repr(loaded.database_url)
+
+    assert password not in shown
+    assert jwt_secret_key not in shown
+    # 値そのものは、明示的に取り出せば使える
+    assert loaded.mysql_password.get_secret_value() == password
+    assert loaded.jwt_secret_key.get_secret_value() == jwt_secret_key
+
+
+@pytest.mark.parametrize(
+    "secret", ["short-secret", "change-me-but-secret-looking-value-1234"], ids=["short", "example"]
+)
+def test_settings_error_does_not_show_secret(secret: str) -> None:
+    """設定の値が誤っているときのエラーに、入力された秘密の値が出ないこと。"""
+    with pytest.raises(ValidationError) as error:
+        make_settings("simplepass", jwt_secret_key=secret)
+
+    assert "jwt_secret_key" in str(error.value)
+    assert secret not in str(error.value)
+
+
+@pytest.mark.parametrize(("length", "ok"), [(31, False), (32, True)])
+def test_jwt_secret_key_length_boundary(length: int, ok: bool) -> None:
+    """JWT_SECRET_KEY は 32 文字以上なら読み込め、31 文字では失敗すること。"""
+    secret = "k" * length
+    if ok:
+        assert make_settings("simplepass", jwt_secret_key=secret).jwt_secret_key.get_secret_value()
+        return
+    with pytest.raises(ValidationError, match="32 文字以上"):
+        make_settings("simplepass", jwt_secret_key=secret)
+
+
+def test_settings_error_from_env_does_not_show_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    """環境変数から読んだ値が誤っているときも、エラーに値が出ないこと。"""
+    monkeypatch.setenv("MYSQL_USER", "helpdesk")
+    monkeypatch.setenv("MYSQL_PASSWORD", "env-password-should-not-appear")
+    monkeypatch.setenv("MYSQL_DATABASE", "helpdesk")
+    monkeypatch.setenv("JWT_SECRET_KEY", "env-short-secret-xyz")
+    monkeypatch.setenv("MYSQL_PORT", "not-a-port-xyz")
+
+    with pytest.raises(ValidationError) as error:
+        Settings(_env_file=None)
+
+    message = str(error.value)
+    assert "jwt_secret_key" in message and "mysql_port" in message
+    for value in ["env-password-should-not-appear", "env-short-secret-xyz", "not-a-port-xyz"]:
+        assert value not in message

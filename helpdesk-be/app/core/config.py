@@ -1,8 +1,11 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
+
+# JWT の署名キーの最低の長さ（推測されないように）
+JWT_SECRET_KEY_MIN_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -16,6 +19,9 @@ class Settings(BaseSettings):
         env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        # 設定の値が誤っているときのエラーに、入力された値を出さない（パスワードなどが
+        # 起動時のエラーやログに出ないように）。どの項目が誤っているかは表示される
+        hide_input_in_errors=True,
     )
 
     # 動かす環境。開発用の操作（テストユーザーの作成など）は development のときだけ行う。
@@ -23,7 +29,9 @@ class Settings(BaseSettings):
     app_env: Literal["development", "production"] = "production"
 
     mysql_user: str
-    mysql_password: str
+    # 秘密の値は SecretStr にする。settings を表示（print・ログ・テスト失敗時の表示）しても、
+    # 値は ********** と出る。使うときは get_secret_value() で取り出す
+    mysql_password: SecretStr
     mysql_database: str
     mysql_host: str = "localhost"
     mysql_port: int = 3307
@@ -39,7 +47,7 @@ class Settings(BaseSettings):
 
     # ログイン用トークン（JWT）の署名に使う秘密の値。既定値は置かず、.env での設定を必須にする
     # （設定し忘れたまま、誰でも知っている値で動いてしまうのを防ぐ）。推測されないよう 32 文字以上
-    jwt_secret_key: str = Field(min_length=32)
+    jwt_secret_key: SecretStr = Field(min_length=JWT_SECRET_KEY_MIN_LENGTH)
     # JWT の有効期限（分）。8 時間（1 日の勤務時間）
     # 0 や負の数だと、ログインしてもすぐに切れてしまうため、1 分以上にする
     jwt_expire_minutes: int = Field(default=480, ge=1)
@@ -60,7 +68,7 @@ class Settings(BaseSettings):
     # 本番で API の一覧を外部に見せないよう、既定は False。開発環境だけ .env で true にする
     enable_api_docs: bool = False
 
-    # 長さの確認（min_length）より先に実行し、見本の値のときは原因が分かるメッセージを出す
+    # 型と長さの確認（SecretStr・min_length）より先に実行し、原因が分かるメッセージを出す
     @field_validator("jwt_secret_key", mode="before")
     @classmethod
     def reject_example_secret(cls, value: object) -> object:
@@ -71,6 +79,11 @@ class Settings(BaseSettings):
                 "JWT_SECRET_KEY が .env.example の見本の値のままです。"
                 "openssl rand -hex 32 などで作った値に変更してください"
             )
+        if isinstance(value, str) and len(value) < JWT_SECRET_KEY_MIN_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET_KEY は {JWT_SECRET_KEY_MIN_LENGTH} 文字以上にしてください。"
+                "openssl rand -hex 32 などで作った値を使ってください"
+            )
         return value
 
     def _build_url(self, host: str, port: int, database: str) -> URL:
@@ -79,7 +92,7 @@ class Settings(BaseSettings):
         return URL.create(
             "mysql+pymysql",
             username=self.mysql_user,
-            password=self.mysql_password,
+            password=self.mysql_password.get_secret_value(),
             host=host,
             port=port,
             database=database,

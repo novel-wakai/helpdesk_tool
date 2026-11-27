@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import mysql
 
 
 # revision identifiers, used by Alembic.
@@ -36,8 +37,9 @@ def upgrade() -> None:
     )
     op.create_table('login_attempts',
     sa.Column('email', sa.String(length=255), nullable=False, comment='メールアドレス'),
-    sa.Column('failed_count', sa.Integer(), nullable=False, comment='数え始めてからの試行の回数'),
-    sa.Column('first_failed_at', sa.DateTime(), nullable=False, comment='数え始めた日時（UTC）。ここから一定時間で回数を数え直す'),
+    sa.Column('failed_count', sa.Integer(), nullable=False, comment='数え始めてから、照合して失敗した回数'),
+    sa.Column('pending_count', sa.Integer(), nullable=False, comment='照合中の試行の数'),
+    sa.Column('first_failed_at', mysql.DATETIME(fsp=6), nullable=False, comment='数え始めた日時（UTC）。ここから一定時間で回数を数え直す'),
     sa.Column('locked_until', sa.DateTime(), nullable=True, comment='この日時（UTC）まではログインできない'),
     sa.PrimaryKeyConstraint('email')
     )
