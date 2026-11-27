@@ -157,7 +157,9 @@ yarn install
 yarn dev
 ```
 
-http://localhost:5173 を開き、「API: 接続OK」と表示されればセットアップ完了です。
+http://localhost:5173 を開くとログイン画面が表示されます。3 で作ったテストユーザー（例：`aaa@example.com` / `Password123`）でログインし、チケット一覧が表示されればセットアップ完了です。
+
+> **注意**：画面は `http://localhost:5173` で開いてください。`http://127.0.0.1:5173` では開けません（開発サーバーは localhost で待ち受けるため）。`yarn dev --host` などで開けるようにしても、API が許可している画面の URL（`.env` の `CORS_ORIGINS`。既定は `http://localhost:5173`）と違うため API を呼べず、ログイン画面に「サーバーに接続できません」と表示されます（ログインの Cookie も `SameSite=Strict` のため、別のサイトとみなされて送られません）。
 
 ## よく使うコマンド
 
@@ -174,7 +176,7 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |
 | FE のビルド（型チェック含む） | `yarn build` | helpdesk-fe |
 | FE のテスト | `yarn test` | helpdesk-fe |
-| E2E テスト（BE を起動した状態で実行） | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
+| E2E テスト（BE を起動し、`make seed` を実行した状態で実行） | `yarn test:e2e`（初回のみ `yarn playwright install chromium`） | helpdesk-fe |
 | FE の Lint（問題の検出 / 自動修正） | `yarn lint` / `yarn lint:fix` | helpdesk-fe |
 | FE の書式（確認 / 自動修正） | `yarn format:check` / `yarn format:fix` | helpdesk-fe |
 
