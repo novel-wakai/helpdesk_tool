@@ -98,12 +98,17 @@ helpdesk_tool/
 cp .env.example .env
 ```
 
-**セキュリティのため、`.env` の `MYSQL_ROOT_PASSWORD` と `MYSQL_PASSWORD` は必ず変更してください。** `.env.example` の値（`change-me` など）は公開されている見本の値です。
+**セキュリティのため、`.env` の `MYSQL_ROOT_PASSWORD`・`MYSQL_PASSWORD`・`JWT_SECRET_KEY` は必ず変更してください。** `.env.example` の値（`change-me` など）は公開されている見本の値です。
 
 ```bash
 # ランダムな値の作り方の例（出力された値を .env に貼り付ける）
-openssl rand -hex 16
+openssl rand -hex 16   # MYSQL_ROOT_PASSWORD / MYSQL_PASSWORD
+openssl rand -hex 32   # JWT_SECRET_KEY（ログイン用トークンの署名に使う。32 文字以上が必須）
 ```
+
+> **注意**：`JWT_SECRET_KEY` が設定されていない、32 文字未満、または `.env.example` の見本の値（`change-me`）のままのときは、BE が起動しません。
+> すでに `.env` を作っている場合は、`.env.example` を見て `APP_ENV=development`・`JWT_SECRET_KEY`・`COOKIE_SECURE=false`・`ENABLE_API_DOCS=true` を追記し、`docker compose up -d` で BE を起動し直してください。
+> `COOKIE_SECURE=false` は開発環境（http://localhost）用の設定です。書き忘れると Cookie が HTTPS の通信でしか送られず、ブラウザによってはログインが保たれません。
 
 > **注意**：パスワードに **`$` は使わないでください**。docker compose は `.env` の `$` を変数の印として扱いますが、ホストで直接動かすコマンド（`poetry run alembic` など）は `.env` をそのまま読むため、両者でパスワードが食い違い、DB に接続できなくなります。`@` `%` `/` `#` `:` などの他の記号は使えます。
 
@@ -117,7 +122,7 @@ docker compose up -d --build
 ```
 
 - 動作確認：http://localhost:8000/api/v1/health
-- API ドキュメント（Swagger UI）：http://localhost:8000/docs
+- API ドキュメント（Swagger UI）：http://localhost:8000/docs（`.env` で `ENABLE_API_DOCS=true` のときだけ表示されます）
 - MySQL はホストの **3307** 番（開発用）と **3308** 番（テスト用）で公開しています（ローカルの MySQL との衝突を避けるため）
 - 起動するコンテナは `db`（開発用 DB）、`db-test`（テスト用 DB）、`be`（API）の 3 つです
 
@@ -128,6 +133,21 @@ cd helpdesk-be
 poetry env use python3.13
 poetry install   # helpdesk-be/.venv に作られる（設定は helpdesk-be/poetry.toml に記載済み）
 ```
+
+続けて、開発用 DB にテーブルを作り、ログインに使うテストユーザーを登録します（どちらも helpdesk-be で実行します）。
+
+```bash
+poetry run alembic upgrade head   # テーブルを作る（最新のマイグレーションまで適用する）
+make seed                         # テストユーザーを作る（作成済みのユーザーは飛ばす）
+```
+
+| メールアドレス | パスワード | アカウントタイプ |
+|---|---|---|
+| aaa@example.com | Password123 | 社員 |
+| bbb@example.com | Password123 | サポート担当 |
+| ccc@example.com | Password123 | 管理者 |
+
+> **注意**：テストユーザーは開発環境専用です。パスワードが公開されているため、本番の DB では `make seed` を実行しないでください（`.env` の `APP_ENV` が `development` でなければ、実行しても何もせずに止まります）。
 
 ### 4. Frontend を起動する
 
@@ -148,6 +168,7 @@ http://localhost:5173 を開き、「API: 接続OK」と表示されればセッ
 | BE の本番用イメージ作成（本番用パッケージのみ） | `docker build --target prod -t helpdesk-be:prod ./helpdesk-be` | リポジトリ直下 |
 | マイグレーション作成 | `poetry run alembic revision --autogenerate -m "内容"` | helpdesk-be |
 | マイグレーション適用 | `poetry run alembic upgrade head` | helpdesk-be |
+| テストユーザーの作成（開発環境専用） | `make seed` | helpdesk-be |
 | BE の Lint（問題の検出 / 自動修正） | `make lint` / `make lint-fix` | helpdesk-be |
 | BE の書式（確認 / 自動修正） | `make format-check` / `make format-fix` | helpdesk-be |
 | FE の開発サーバー | `yarn dev` | helpdesk-fe |
