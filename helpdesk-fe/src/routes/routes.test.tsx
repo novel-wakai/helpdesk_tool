@@ -14,6 +14,7 @@ import { renderRoutes } from '../test/render'
 // BE の API は呼ばず、応答を差し替える
 vi.mock('../api/auth', () => ({
   login: vi.fn(),
+  logout: vi.fn(),
   fetchCurrentUser: vi.fn(),
 }))
 
